@@ -1,6 +1,6 @@
 %% ========================================================================
 % Set names to directories and files
-settingsDir = '..\..\..\config';
+settingsDir = fullfile('..', '..', '..', 'config');
 settingsFileName = fullfile(settingsDir, 'sift.conf');
 
 settingsFile = fopen(settingsFileName, 'r');
