@@ -36,10 +36,9 @@ function [] = ncFindNearest(inputImageFile, imagebasePath, fdescription, net, ib
     % tic;
     % Read image and compute neural codes:
     inputImage = single(imread(inputImageFile));
-    netHeight = net.normalization.imageSize(1);
-    netWidth = net.normalization.imageSize(2);
-    inputImage = ...
-        imresize(inputImage, [netHeight * (maxPatchLevelRef + 1) / 2, netWidth * (maxPatchLevelRef + 1) / 2]);
+    netHeight = net.meta.normalization.imageSize(1);
+    netWidth = net.meta.normalization.imageSize(2);
+    inputImage = imresize(inputImage, [netHeight * (maxPatchLevelRef + 1) / 2, netWidth * (maxPatchLevelRef + 1) / 2]);
     for patchLevelRef = 1:maxPatchLevelRef
         head = sum((0:(patchLevelRef-1)) .^ 2) + 1;
         tail = sum((1:patchLevelRef) .^ 2);

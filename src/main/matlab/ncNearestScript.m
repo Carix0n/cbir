@@ -30,6 +30,7 @@ netsPath = fullfile(rootDir, 'nets');
 netFileName; % Value storage in the settings file
 netFullName = fullfile(netsPath, netFileName);
 net = load(netFullName);
+net = vl_simplenn_tidy(net); % Update pre-trained model if used the old version
 [~, netName, ~] = fileparts(netFullName);
 
 maxPatchLevelQuery; % Value storage in the settings file
