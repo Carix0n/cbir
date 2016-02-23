@@ -1,7 +1,7 @@
-function [] = ncFindNearest(inputImageFile, imagebasePath, fdescription, net, ibNC, U, resultFullName, ...
-    maxPatchLevelRef, maxPatchLevelQuery, descrVecLen, GPU_MODE)
-% [] = ncFindNearest(inputImageFile, imagebasePath, fdescription, net, ibNC, U, resultFullName,
-%       maxPatchLevelRef, maxPatchLevelQuery, descrVecLen, GPU_MODE)
+function [] = ncFindNearest(inputImageFile, imagebasePath, fdescription, net, ibNC, U, resultFullName, maxPatchLevelRef, maxPatchLevelQuery, ...
+    descrVecLen, GPU_MODE)
+% [] = ncFindNearest(inputImageFile, imagebasePath, fdescription, net, ibNC, U, resultFullName, maxPatchLevelRef, maxPatchLevelQuery,
+%   descrVecLen, GPU_MODE)
 %
 % Computes top-10 nearest images with neural codes
 %
@@ -33,7 +33,6 @@ function [] = ncFindNearest(inputImageFile, imagebasePath, fdescription, net, ib
         neuralcodesInput = zeros(4096, sum((1:maxPatchLevelQuery) .^ 2), 'single');
     end
     
-    % tic;
     % Read image and compute neural codes:
     inputImage = single(imread(inputImageFile));
     netHeight = net.meta.normalization.imageSize(1);
@@ -42,10 +41,8 @@ function [] = ncFindNearest(inputImageFile, imagebasePath, fdescription, net, ib
     for patchLevelRef = 1:maxPatchLevelRef
         head = sum((0:(patchLevelRef-1)) .^ 2) + 1;
         tail = sum((1:patchLevelRef) .^ 2);
-        neuralcodesInput(:, head:tail) = ncPatchCodes(inputImage, net, patchLevelRef, firstFCIndex, ...
-            GPU_MODE);
+        neuralcodesInput(:, head:tail) = ncPatchCodes(inputImage, net, patchLevelRef, firstFCIndex, GPU_MODE);
     end
-    % fprintf('Input image neural codes computation: %f sec.\n', toc);
     
     % Read neural codes from image database
     % and compute distances between images and sort:
@@ -62,32 +59,24 @@ function [] = ncFindNearest(inputImageFile, imagebasePath, fdescription, net, ib
         headSum = 0;
         tailSum = 0;
         if GPU_MODE
-            neuralcodesInputPCA = zeros(descrVecLen, sum((1:maxPatchLevelQuery) .^ 2), ...
-                'single', 'gpuArray');
+            neuralcodesInputPCA = zeros(descrVecLen, sum((1:maxPatchLevelQuery) .^ 2), 'single', 'gpuArray');
         else
-            neuralcodesInputPCA = zeros(descrVecLen, sum((1:maxPatchLevelQuery) .^ 2), ...
-                'single');
+            neuralcodesInputPCA = zeros(descrVecLen, sum((1:maxPatchLevelQuery) .^ 2), 'single');
         end
         for patchLevelRef = 1:maxPatchLevelRef
-            % tic;
-            
             headSum = headSum + (patchLevelRef - 1) ^ 2;
             tailSum = tailSum + patchLevelRef ^ 2;
             head = headSum + 1;
             tail = tailSum;
             
-            neuralcodesInputPCA(:, head:tail) = ...
-                applyTransform(neuralcodesInput(:, head:tail), U(:,:, patchLevelRef), descrVecLen);
-            
-            % fprintf('PCA application on level #%d: %f sec.\n', patchLevelRef, toc);
+            neuralcodesInputPCA(:, head:tail) = applyTransform(neuralcodesInput(:, head:tail), U(:,:, patchLevelRef), descrVecLen);
         end
         neuralcodesInput = neuralcodesInputPCA;
         clear neuralcodesInputPCA;
         clear U;
         
     end
-    
-    % tic;
+
     totalNumCols = size(ibNC, 2);
     rest = totalNumCols;
     while rest > 0
@@ -114,7 +103,6 @@ function [] = ncFindNearest(inputImageFile, imagebasePath, fdescription, net, ib
     pairwiseDistTable = reshape(pairwiseDistTable, [patchesPerImageRef, patchesPerImageQuery, Nimages]);
     minDistances = reshape(min(pairwiseDistTable, [], 2), [patchesPerImageRef, Nimages]);
     ncDif = mean(minDistances);
-    % fprintf('Pairwise distance computation: %f sec.\n', toc);
     
     % Ranking images:
     [~, sortedIndex] = sort(ncDif);

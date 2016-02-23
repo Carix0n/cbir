@@ -51,10 +51,8 @@ patchesPerImageQuery = sum((1:maxPatchLevelQuery) .^ 2);
 
 for patchLevel = 1:maxPatchLevel
     ncFileName = generateFileName({baseName; netName; 'nc'; int2str(patchLevel)}, '.bin');
-    ncFileNamePCA = generateFileName({baseName; netName; 'nc';...
-        int2str(patchLevel); int2str(descrVecLen)}, '.bin');
-    ncFileNameMatrixPCA = generateFileName({baseName; netName; 'pca';...
-        int2str(patchLevel)}, '.bin');
+    ncFileNamePCA = generateFileName({baseName; netName; 'nc'; int2str(patchLevel); int2str(descrVecLen)}, '.bin');
+    ncFileNameMatrixPCA = generateFileName({baseName; netName; 'pca'; int2str(patchLevel)}, '.bin');
     ncFullNameList{patchLevel} = fullfile(ncPath, ncFileName);
     ncFullNamePCAList{patchLevel} = fullfile(ncPath, ncFileNamePCA);
     ncFullNameMatrixPCAList{patchLevel} = fullfile(ncPath, ncFileNameMatrixPCA);
@@ -68,8 +66,7 @@ end
 for patchLevel = 1:maxPatchLevel
     ncFullName = ncFullNameList{patchLevel};
     if ~exist(ncFullName, 'file')
-        fprintf('Features from %s network on patch level #%d are not available\nExtracting...\n', ...
-            netName, patchLevel);
+        fprintf('Features from %s network on patch level #%d are not available\nExtracting...\n', netName, patchLevel);
         
         ncCompute(imagebasePath, fdescription, net, ncFullName, patchLevel, GPU_MODE);
         
@@ -165,6 +162,6 @@ else
 end
 
 fprintf('Searching for nearest images...\n');
-ncFindNearest(inputImageFullName, imagebasePath, fdescription, net, ibNC, U, resultFullName, ...
-    maxPatchLevelRef, maxPatchLevelQuery, descrVecLen, GPU_MODE);
+ncFindNearest(inputImageFullName, imagebasePath, fdescription, net, ibNC, U, resultFullName, maxPatchLevelRef, maxPatchLevelQuery, descrVecLen, ...
+    GPU_MODE);
 fprintf('Done!\n');
