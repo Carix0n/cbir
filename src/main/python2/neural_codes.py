@@ -92,4 +92,7 @@ def nc_find_nearest(input_image_file, imbase_path, imbase_files, net, layer_name
     n_images = len(imbase_files)
     num_patches_per_image_query = np.square(np.arange(1, max_patch_level_query).sum())
     num_patches_per_image_ref = np.square(np.arange(1, max_patch_level_ref).sum())
-    
+    for patch_level_ref in xrange(1, max_patch_level_ref):
+        head = np.square(np.arange(0, max_patch_level_ref - 1).sum())
+        tail = np.square(np.arange(1, max_patch_level_ref).sum())
+        neural_codes_input = nc_patch_codes(list(input_image_file), net, patch_level_ref, layer_name, gpu_mode)

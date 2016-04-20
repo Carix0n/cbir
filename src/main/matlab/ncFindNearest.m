@@ -79,12 +79,12 @@ function [] = ncFindNearest(inputImageFile, imagebasePath, fdescription, net, ib
 
     totalNumCols = size(ibNC, 2);
     rest = totalNumCols;
+    numBytesPerPatchNC = 4 * size(neuralcodesInput, 1);
     while rest > 0
-        % 4 bytes * 4096 elements = 16384 bytes
         if GPU_MODE
-            availableNumCols = device.AvailableMemory / 16384;
+            availableNumCols = device.AvailableMemory / numBytesPerPatchNC;
         else
-            availableNumCols = device.MaxPossibleArrayBytes / 16384;
+            availableNumCols = device.MaxPossibleArrayBytes / numBytesPerPatchNC;
         end
         
         if availableNumCols > 2 * rest
