@@ -28,9 +28,9 @@ function [] = ncFindNearest(inputImageFile, imagebasePath, fdescription, net, ib
     
     % Pre-allocation of input image patch codes:
     if GPU_MODE
-        neuralcodesInput = zeros(4096, sum((1:maxPatchLevelQuery) .^ 2), 'single', 'gpuArray');
+        neuralcodesInput = zeros(4096, sum((1:maxPatchLevelRef) .^ 2), 'single', 'gpuArray');
     else
-        neuralcodesInput = zeros(4096, sum((1:maxPatchLevelQuery) .^ 2), 'single');
+        neuralcodesInput = zeros(4096, sum((1:maxPatchLevelRef) .^ 2), 'single');
     end
     
     % Read image and compute neural codes:
