@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from src.main.python2.extra_functions import pairwise_distance
+from src.main.python.extra_functions import pairwise_distance
 
 class TestExtraFunctions(unittest.TestCase):
     def test_pairwise_distance(self):
