@@ -5,3 +5,4 @@
 .history
 .lib/
 .models
+*.pyc
