@@ -82,7 +82,8 @@ def nc_compute(imbase_path, imbase_files, net, layer_name, patch_level, image_me
         head = n_images - rest
         tail = n_images - rest + used_num
         rest -= used_num
-        neural_codes[head:tail] = nc_patch_codes(imbase_files[head:tail], net, layer_name, patch_level, image_mean_path, gpu_mode)
+        neural_codes[(head * num_patches_per_image):(tail * num_patches_per_image)] = \
+            nc_patch_codes(imbase_files[head:tail], net, layer_name, patch_level, image_mean_path, gpu_mode)
 
     return neural_codes
 
@@ -99,13 +100,13 @@ def nc_find_nearest(input_image_file_name, imbase_path, imbase_files, net, layer
     assert type(gpu_mode) is bool
 
     n_images = len(imbase_files)
-    num_patches_per_image_ref = np.square(np.arange(1, max_patch_level_ref + 1).sum())
-    num_patches_per_image_query = np.square(np.arange(1, max_patch_level_query + 1).sum())
-    neural_codes_ref = np.empty([np.arange(1, max_patch_level_ref + 1).sum(), net.params[layer_name][1].data.shape[0]], dtype=np.float32)
+    num_patches_per_image_ref = np.square(np.arange(1, max_patch_level_ref + 1)).sum()
+    num_patches_per_image_query = np.square(np.arange(1, max_patch_level_query + 1)).sum()
+    neural_codes_ref = np.empty([num_patches_per_image_ref, net.params[layer_name][1].data.shape[0]], dtype=np.float32)
 
     for patch_level_ref in xrange(1, max_patch_level_ref + 1):
-        head = np.square(np.arange(max_patch_level_ref).sum())
-        tail = np.square(np.arange(1, max_patch_level_ref + 1).sum())
+        head = np.square(np.arange(patch_level_ref)).sum()
+        tail = np.square(np.arange(1, patch_level_ref + 1)).sum()
         neural_codes_ref[head:tail] = nc_patch_codes([input_image_file_name], net, layer_name, patch_level_ref, image_mean_path, gpu_mode)
 
     pairwise_dist_table = np.zeros((num_patches_per_image_ref, n_images * num_patches_per_image_query), dtype=np.float32)
@@ -121,7 +122,7 @@ def nc_find_nearest(input_image_file_name, imbase_path, imbase_files, net, layer
         rest -= used_num
         pairwise_dist_table[:, head:tail] = pairwise_distance(neural_codes_ref, neural_codes_query[head:tail])
 
-    neural_codes_distances = np.ravel(np.min(pairwise_dist_table.reshape([num_patches_per_image_ref, max_patch_level_query, n_images]), axis=1).mean(axis=0))
+    neural_codes_distances = np.min(pairwise_dist_table.reshape([num_patches_per_image_ref, num_patches_per_image_query, n_images]), axis=1).mean(axis=0)
     sorted_indices = neural_codes_distances.argsort()
     n_nearest = min(n_images, 10)
     show_nearest(input_image_file_name, imbase_path, imbase_files, sorted_indices, n_nearest)
@@ -134,7 +135,7 @@ def read_imbase_nc(neural_codes_full_name_list, descr_vec_len, n_images, max_pat
     assert type(max_patch_level_query) is int
     assert type(gpu_mode) is bool
 
-    num_patches_per_image_query = np.square(np.arange(1, max_patch_level_query + 1).sum())
+    num_patches_per_image_query = np.square(np.arange(1, max_patch_level_query + 1)).sum()
     neural_codes_list = [np.load(neural_codes_full_name) for neural_codes_full_name in neural_codes_full_name_list]
     neural_codes = np.empty((n_images * num_patches_per_image_query, descr_vec_len), dtype=np.float32)
 

@@ -29,7 +29,7 @@ if __name__ == '__main__':
     caffe.set_mode_gpu() if args.gpu_mode else caffe.set_mode_cpu()
 
     n_images = len(imbase_list)
-    num_patches_per_image_query = np.square(np.arange(1, args.max_patch_level_query).sum())
+    num_patches_per_image_query = np.square(np.arange(1, args.max_patch_level_query)).sum()
     ext = '.npy'
 
     nc_full_name_list = [os.path.join(nc_path, '_'.join([args.imbase_name, net_name, 'nc', str(patch_level)]) + ext) for patch_level in xrange(1, args.max_patch_level_query + 1)]
