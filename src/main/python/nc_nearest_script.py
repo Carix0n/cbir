@@ -2,6 +2,8 @@ import os
 import caffe
 import argparse
 import numpy as np
+import skimage
+from skimage import io
 from extra_functions import list_image_dir
 from neural_codes import nc_compute, read_imbase_nc, nc_find_nearest
 
@@ -13,15 +15,16 @@ if __name__ == '__main__':
     parser.add_argument('--net_file_name', type=str)
     parser.add_argument('--image_mean', type=str)
     parser.add_argument('--input_image_file_name', type=str)
-    parser.add_argument('--max_patch_level_ref', type=int, default=1)
-    parser.add_argument('--max_patch_level_query', type=int, default=1)
-    parser.add_argument('--descr_vec_len', type=int, default=4096)
-    parser.add_argument('--gpu_mode', type=bool, default=False)
+    parser.add_argument('--max_patch_level_ref', type=int)
+    parser.add_argument('--max_patch_level_query', type=int)
+    parser.add_argument('--descr_vec_len', type=int)
+    parser.add_argument('--gpu_mode', type=bool)
     args = parser.parse_args()
 
     working_dir = os.path.join(args.root_dir, 'collections', args.imbase_name)
     imbase_path = os.path.join(working_dir, 'images')
     imbase_list = list_image_dir(imbase_path)
+    imbase = skimage.io.imread_collection(imbase_list, conserve_memory=True)
     nc_path = os.path.join(working_dir, 'neuralcodes')
     net = caffe.Net(args.net_def, args.net_file_name, caffe.TEST)
     net_name = os.path.basename(args.net_file_name).split('.')[0]
@@ -41,7 +44,7 @@ if __name__ == '__main__':
         nc_full_name = nc_full_name_list[patch_level - 1]
         if not os.path.isfile(nc_full_name):
             print 'Features from {0} network on patch level #{1} are not available, extracting...'.format(net_name, patch_level)
-            neural_codes_on_level = nc_compute(imbase_path, imbase_list, net, 'fc6', patch_level, args.image_mean, args.gpu_mode)
+            neural_codes_on_level = nc_compute(imbase, net, 'fc6', patch_level, args.image_mean, args.gpu_mode)
             np.save(nc_full_name, neural_codes_on_level)  # alternative read/write through np.ndarray.tofile(), np.fromfile()
             print 'Completed'
 
@@ -57,5 +60,5 @@ if __name__ == '__main__':
     neural_codes = read_imbase_nc(nc_full_name_list, args.descr_vec_len, n_images, args.max_patch_level_query, args.gpu_mode)
 
     print 'Searching for nearest images...'
-    nc_find_nearest(input_image_full_name, imbase_path, imbase_list, net, 'fc6', neural_codes, args.max_patch_level_ref, args.max_patch_level_query, args.image_mean, args.gpu_mode)
+    nc_find_nearest(input_image_full_name, imbase, net, 'fc6', neural_codes, args.max_patch_level_ref, args.max_patch_level_query, args.image_mean, args.gpu_mode)
     print 'Done!'

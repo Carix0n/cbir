@@ -10,7 +10,7 @@ def list_image_dir(imbase_path):
     files = os.listdir(imbase_path)
     if files[0] == 'Thumbs.db':
         files = files[1:]
-    files = [elem for elem in files if os.path.isfile(os.path.join(imbase_path, elem))]
+    files = [os.path.join(imbase_path, elem) for elem in files if os.path.isfile(os.path.join(imbase_path, elem))]
     return files
 
 
@@ -27,14 +27,12 @@ def pairwise_distance(x, y):
     return x_norm - 2 * np.dot(x, y) + y_norm
 
 
-def show_nearest(input_image_file, imbase_path, imbase_files, sorted_indices, n_top_images):
-    assert type(input_image_file) is str
-    assert type(imbase_path) is str
-    assert type(imbase_files) is list
+def show_nearest(input_image, imbase, sorted_indices, n_top_images):
+    assert type(input_image) is np.ndarray and input_image.ndim == 3
+    assert type(imbase) is skimage.io.ImageCollection
     assert type(sorted_indices) is np.ndarray and sorted_indices.ndim == 1
     assert type(n_top_images) is int and n_top_images <= 10
 
-    input_image = skimage.io.imread(input_image_file)
     plt.figure(1)
     plt.imshow(input_image)
     plt.axis('off')
@@ -44,10 +42,9 @@ def show_nearest(input_image_file, imbase_path, imbase_files, sorted_indices, n_
     n_cols = 5
     for image_index in xrange(n_top_images):
         sp = fig.add_subplot(n_rows, n_cols, image_index + 1)
-        image = skimage.io.imread(os.path.join(imbase_path, imbase_files[sorted_indices[image_index]]))
         sp.axes.get_xaxis().set_visible(False)
         sp.axes.get_yaxis().set_visible(False)
-        sp.imshow(image)
+        sp.imshow(imbase[sorted_indices[image_index]])
         sp.autoscale(False)
 
     plt.show()
