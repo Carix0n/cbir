@@ -32,9 +32,9 @@ if __name__ == '__main__':
     caffe.set_mode_gpu() if args.gpu_mode else caffe.set_mode_cpu()
 
     n_images = len(imbase_list)
-    num_patches_per_image_query = \
-        np.square(np.arange(1, args.max_patch_level_query)).sum()
-    transformer = caffe_image_transformer(net, args.image_mean)
+    num_patches_per_image_query = np.square(np.arange(1, args.max_patch_level_query)).sum()
+    image_mean = np.load(args.image_mean)
+    transformer = caffe_image_transformer(net.blobs['data'].data.shape, image_mean)
     ext = '.npy'
 
     nc_full_name_list = [os.path.join(nc_path, '_'.join([args.imbase_name, net_name, 'nc', str(patch_level)]) + ext)
@@ -50,7 +50,6 @@ if __name__ == '__main__':
                 format(net_name, patch_level)
             neural_codes_on_level = nc_compute(imbase, net, 'fc6', patch_level, transformer, args.gpu_mode)
             np.save(nc_full_name, neural_codes_on_level)
-            # alternative read/write through np.ndarray.tofile(), np.fromfile()
             print 'Completed'
 
     result_path = os.path.join(working_dir, 'result')

@@ -6,19 +6,23 @@ from skimage import io
 from extra_functions import pairwise_distance, show_nearest
 
 
-def caffe_image_transformer(net, image_mean_path):
-    assert type(net) is caffe.Net
+def caffe_image_transformer(shape, image_mean):
+    assert type(shape) is tuple
+    assert len(shape) == 4
+    assert type(image_mean) is np.ndarray
+    assert image_mean.ndim == 3
+    assert shape[1] == image_mean.shape[0]
 
-    mean = np.load(image_mean_path).transpose((1, 2, 0))
-    im_height = net.blobs['data'].data.shape[2]
-    im_width = net.blobs['data'].data.shape[3]
-    mean = caffe.io.resize_image(mean, (im_height, im_width)).transpose((2, 0, 1))
-    transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
+    image_mean = image_mean.transpose((1, 2, 0))
+    im_height = shape[2]
+    im_width = shape[3]
+    image_mean = caffe.io.resize_image(image_mean, (im_height, im_width)).transpose((2, 0, 1))
+    transformer = caffe.io.Transformer({'data': shape})
     transformer.set_transpose('data', (2, 0, 1))  # move image channels to outermost dimension
-    transformer.set_mean('data', mean)  # subtract the dataset-mean value in each channel
-    # uncomment next line with usage of caffe.io.load_image()
-    # transformer.set_raw_scale('data', 255)  # rescale from [0, 1] to [0, 255]
     transformer.set_channel_swap('data', (2, 1, 0))  # swap channels from RGB to BGR
+    # uncomment next line when use caffe.io.load_image()
+    # transformer.set_raw_scale('data', 255)  # rescale from [0, 1] to [0, 255]
+    transformer.set_mean('data', image_mean)  # subtract the dataset-mean value in each channel
 
     return transformer
 
@@ -37,8 +41,8 @@ def nc_patch_codes(imbase, net, layer_name, patch_level, transformer, gpu_mode):
     neural_codes = np.empty((total_patches_num, net.params[layer_name][1].data.shape[0]), dtype=np.float32)
     patch_index = 0
 
-    for image_index in xrange(n_images):
-        im = imbase[image_index]
+    for im in imbase:
+        im = im.astype(np.float32)
         im_height = im.shape[0]
         im_width = im.shape[1]
         for patch_ver_index in xrange(1, patch_level + 1):
@@ -119,14 +123,25 @@ def nc_find_nearest(input_image_full_name, imbase, net, layer_name, neural_codes
         rest -= used_num
         pairwise_distance_table[:, head:tail] = pairwise_distance(neural_codes_ref, neural_codes_query[head:tail])
 
-    pairwise_distance_table = pairwise_distance_table.reshape((num_patches_per_image_ref,
-                                                               num_patches_per_image_query,
-                                                               n_images))
-    min_distance_table = np.min(pairwise_distance_table, axis=1)
-    neural_codes_distances = np.mean(min_distance_table, axis=0)
+    neural_codes_distances = nc_distances(pairwise_distance_table, (num_patches_per_image_ref,
+                                                                    n_images,
+                                                                    num_patches_per_image_query))
     sorted_indices = neural_codes_distances.argsort()
     n_nearest = min(n_images, 10)
     show_nearest(input_image_as_collection[0], imbase, sorted_indices, n_nearest)
+
+
+def nc_distances(pairwise_distance_table, shape):
+    assert type(pairwise_distance_table) is np.ndarray or type(pairwise_distance_table) is np.matrix
+    assert pairwise_distance_table.ndim == 2
+    assert type(shape) is tuple
+    assert len(shape) == 3
+    assert np.prod(pairwise_distance_table.shape) == np.prod(shape)
+
+    pairwise_distance_table = pairwise_distance_table.reshape(shape)
+    min_distance_table = np.min(pairwise_distance_table, axis=2)
+    neural_codes_distances = np.mean(min_distance_table, axis=0)
+    return neural_codes_distances
 
 
 def read_imbase_nc(neural_codes_full_name_list, descr_vec_len, n_images, max_patch_level_query, gpu_mode):
@@ -138,7 +153,7 @@ def read_imbase_nc(neural_codes_full_name_list, descr_vec_len, n_images, max_pat
 
     num_patches_per_image_query = np.square(np.arange(1, max_patch_level_query + 1)).sum()
     neural_codes_list = [np.load(neural_codes_full_name) for neural_codes_full_name in neural_codes_full_name_list]
-    neural_codes = np.empty((n_images * num_patches_per_image_query, descr_vec_len), dtype=np.float32)
+    neural_codes = np.zeros((n_images * num_patches_per_image_query, descr_vec_len), dtype=np.float32)
 
     for image_index in xrange(n_images):
         for patch_level in xrange(1, max_patch_level_query + 1):
