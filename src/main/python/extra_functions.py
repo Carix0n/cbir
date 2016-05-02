@@ -8,8 +8,10 @@ import matplotlib.pyplot as plt
 
 def list_image_dir(imbase_path):
     files = os.listdir(imbase_path)
+
     if files[0] == 'Thumbs.db':
         files = files[1:]
+
     files = [os.path.join(imbase_path, elem) for elem in files if os.path.isfile(os.path.join(imbase_path, elem))]
     return files
 
@@ -38,8 +40,10 @@ def show_nearest(input_image, imbase, sorted_indices, n_top_images):
     plt.axis('off')
     plt.show()
     fig = plt.figure(2)
+
     n_rows = 2
     n_cols = 5
+
     for image_index in xrange(n_top_images):
         sp = fig.add_subplot(n_rows, n_cols, image_index + 1)
         sp.axes.get_xaxis().set_visible(False)

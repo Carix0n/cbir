@@ -23,18 +23,18 @@ def caffe_image_transformer(net, image_mean_path):
     return transformer
 
 
-def nc_patch_codes(imbase, net, layer_name, patch_level, image_mean_path, gpu_mode):
+def nc_patch_codes(imbase, net, layer_name, patch_level, transformer, gpu_mode):
     assert type(imbase) is skimage.io.ImageCollection
     assert type(net) is caffe.Net
-    assert type(patch_level) is int
     assert type(layer_name) is str
+    assert type(patch_level) is int
+    assert isinstance(transformer, caffe.io.Transformer)  # old-style class
     assert type(gpu_mode) is bool
 
     n_images = len(imbase.files)
     num_patches_per_image = patch_level ** 2
     total_patches_num = n_images * num_patches_per_image
     neural_codes = np.empty((total_patches_num, net.params[layer_name][1].data.shape[0]), dtype=np.float32)
-    transformer = caffe_image_transformer(net, image_mean_path)
     patch_index = 0
 
     for image_index in xrange(n_images):
@@ -50,22 +50,24 @@ def nc_patch_codes(imbase, net, layer_name, patch_level, image_mean_path, gpu_mo
                 patch = im[ver_lower_bound:ver_upper_bound, hor_lower_bound:hor_upper_bound, :]
                 net.blobs['data'].data[...] = transformer.preprocess('data', patch)
                 net.forward()
-                neural_codes[patch_index] = net.blobs[layer_name].data[0]  # initially there was a .copy(), but getting rid of it is still works fine
+                neural_codes[patch_index] = net.blobs[layer_name].data[0]
                 patch_index += 1
 
     return neural_codes
 
 
-def nc_compute(imbase, net, layer_name, patch_level, image_mean_path, gpu_mode):
+def nc_compute(imbase, net, layer_name, patch_level, transformer, gpu_mode):
     assert type(imbase) is skimage.io.ImageCollection
     assert type(net) is caffe.Net
     assert type(layer_name) is str
     assert type(patch_level) is int
+    assert isinstance(transformer, caffe.io.Transformer)  # old-style class
     assert type(gpu_mode) is bool
 
     n_images = len(imbase.files)
     num_patches_per_image = patch_level ** 2
-    neural_codes = np.empty((n_images * num_patches_per_image, net.params[layer_name][1].data.shape[0]), dtype=np.float32)
+    neural_codes = np.empty((n_images * num_patches_per_image, net.params[layer_name][1].data.shape[0]),
+                            dtype=np.float32)
     rest = n_images
 
     while rest > 0:
@@ -74,12 +76,13 @@ def nc_compute(imbase, net, layer_name, patch_level, image_mean_path, gpu_mode):
         tail = n_images - rest + used_num
         rest -= used_num
         neural_codes[(head * num_patches_per_image):(tail * num_patches_per_image)] = \
-            nc_patch_codes(imbase[head:tail], net, layer_name, patch_level, image_mean_path, gpu_mode)
+            nc_patch_codes(imbase[head:tail], net, layer_name, patch_level, transformer, gpu_mode)
 
     return neural_codes
 
 
-def nc_find_nearest(input_image_full_name, imbase, net, layer_name, neural_codes_query, max_patch_level_ref, max_patch_level_query, image_mean_path, gpu_mode):
+def nc_find_nearest(input_image_full_name, imbase, net, layer_name, neural_codes_query,
+                    max_patch_level_ref, max_patch_level_query, transformer, gpu_mode):
     assert type(input_image_full_name) is str
     assert type(imbase) is skimage.io.ImageCollection
     assert type(net) is caffe.Net
@@ -87,6 +90,7 @@ def nc_find_nearest(input_image_full_name, imbase, net, layer_name, neural_codes
     assert type(neural_codes_query) is np.ndarray
     assert type(max_patch_level_ref) is int
     assert type(max_patch_level_query) is int
+    assert isinstance(transformer, caffe.io.Transformer)  # old-style class
     assert type(gpu_mode) is bool
 
     n_images = len(imbase.files)
@@ -98,9 +102,11 @@ def nc_find_nearest(input_image_full_name, imbase, net, layer_name, neural_codes
     for patch_level_ref in xrange(1, max_patch_level_ref + 1):
         head = np.square(np.arange(patch_level_ref)).sum()
         tail = np.square(np.arange(1, patch_level_ref + 1)).sum()
-        neural_codes_ref[head:tail] = nc_patch_codes(input_image_as_collection, net, layer_name, patch_level_ref, image_mean_path, gpu_mode)
+        neural_codes_ref[head:tail] = nc_patch_codes(input_image_as_collection, net, layer_name, patch_level_ref,
+                                                     transformer, gpu_mode)
 
-    pairwise_distance_table = np.zeros((num_patches_per_image_ref, num_patches_per_image_query * n_images), dtype=np.float32)
+    pairwise_distance_table = np.zeros((num_patches_per_image_ref, num_patches_per_image_query * n_images),
+                                       dtype=np.float32)
     # here we should use PCA
     total_rows_num = neural_codes_query.shape[0]
     # for more complicated algorithm: num_bytes_per_patch_nc = np.float32().nbytes * neural_codes_ref.shape[1]
@@ -113,8 +119,9 @@ def nc_find_nearest(input_image_full_name, imbase, net, layer_name, neural_codes
         rest -= used_num
         pairwise_distance_table[:, head:tail] = pairwise_distance(neural_codes_ref, neural_codes_query[head:tail])
 
-    # neural_codes_distances = np.min(pairwise_distance_table.reshape((num_patches_per_image_ref, num_patches_per_image_query, n_images)), axis=1).mean(axis=0)
-    pairwise_distance_table = pairwise_distance_table.reshape((num_patches_per_image_ref, num_patches_per_image_query, n_images))
+    pairwise_distance_table = pairwise_distance_table.reshape((num_patches_per_image_ref,
+                                                               num_patches_per_image_query,
+                                                               n_images))
     min_distance_table = np.min(pairwise_distance_table, axis=1)
     neural_codes_distances = np.mean(min_distance_table, axis=0)
     sorted_indices = neural_codes_distances.argsort()
@@ -134,10 +141,12 @@ def read_imbase_nc(neural_codes_full_name_list, descr_vec_len, n_images, max_pat
     neural_codes = np.empty((n_images * num_patches_per_image_query, descr_vec_len), dtype=np.float32)
 
     for image_index in xrange(n_images):
-        for patch_level_query in xrange(1, max_patch_level_query + 1):
-            num_patches_per_im_level = patch_level_query ** 2
-            head = image_index * num_patches_per_image_query + np.square(np.arange(patch_level_query)).sum()
-            tail = image_index * num_patches_per_image_query + np.square(np.arange(1, patch_level_query + 1)).sum()
-            neural_codes[head:tail] = neural_codes_list[patch_level_query - 1][(image_index * num_patches_per_im_level):((image_index + 1) * num_patches_per_im_level)]
+        for patch_level in xrange(1, max_patch_level_query + 1):
+            num_patches_per_im_level = patch_level ** 2
+            head = image_index * num_patches_per_image_query + np.square(np.arange(patch_level)).sum()
+            head_in_matrix = image_index * num_patches_per_im_level
+            tail = image_index * num_patches_per_image_query + np.square(np.arange(1, patch_level + 1)).sum()
+            tail_in_matrix = (image_index + 1) * num_patches_per_im_level
+            neural_codes[head:tail] = neural_codes_list[patch_level - 1][head_in_matrix:tail_in_matrix]
 
     return neural_codes
