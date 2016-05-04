@@ -1,9 +1,8 @@
-import os
 import numpy as np
 import caffe
 import skimage
 from skimage import io
-from extra_functions import pairwise_distance, show_nearest
+from extra_functions import pairwise_distance, pca_apply, show_nearest
 
 
 def caffe_image_transformer(shape, image_mean):
@@ -86,21 +85,26 @@ def nc_compute(imbase, net, layer_name, patch_level, transformer, gpu_mode):
 
 
 def nc_find_nearest(input_image_full_name, imbase, net, layer_name, neural_codes_query,
-                    max_patch_level_ref, max_patch_level_query, transformer, gpu_mode):
+                    max_patch_level_ref, max_patch_level_query, transformer, gpu_mode, u_reduce):
     assert type(input_image_full_name) is str
     assert type(imbase) is skimage.io.ImageCollection
     assert type(net) is caffe.Net
     assert type(layer_name) is str
     assert type(neural_codes_query) is np.ndarray
+    assert type(u_reduce) is np.ndarray and u_reduce.ndim == 2
     assert type(max_patch_level_ref) is int
     assert type(max_patch_level_query) is int
     assert isinstance(transformer, caffe.io.Transformer)  # old-style class
     assert type(gpu_mode) is bool
+    layer_output_size = net.params[layer_name][1].data.shape[0]
+    assert (u_reduce is None and neural_codes_query.shape[1] == layer_output_size) or \
+           (type(u_reduce) is np.ndarray and u_reduce.ndim == 2) or \
+           (type(u_reduce) is np.matrix)
 
     n_images = len(imbase.files)
     num_patches_per_image_ref = np.square(np.arange(1, max_patch_level_ref + 1)).sum()
     num_patches_per_image_query = np.square(np.arange(1, max_patch_level_query + 1)).sum()
-    neural_codes_ref = np.empty([num_patches_per_image_ref, net.params[layer_name][1].data.shape[0]], dtype=np.float32)
+    neural_codes_ref = np.empty([num_patches_per_image_ref, layer_output_size], dtype=np.float32)
     input_image_as_collection = skimage.io.ImageCollection(input_image_full_name)
 
     for patch_level_ref in xrange(1, max_patch_level_ref + 1):
@@ -111,9 +115,14 @@ def nc_find_nearest(input_image_full_name, imbase, net, layer_name, neural_codes
 
     pairwise_distance_table = np.zeros((num_patches_per_image_ref, num_patches_per_image_query * n_images),
                                        dtype=np.float32)
-    # here we should use PCA
+
     total_rows_num = neural_codes_query.shape[0]
-    # for more complicated algorithm: num_bytes_per_patch_nc = np.float32().nbytes * neural_codes_ref.shape[1]
+    descr_vec_len = neural_codes_query.shape[1]
+
+    if descr_vec_len < layer_output_size:
+        neural_codes_ref = pca_apply(neural_codes_ref, u_reduce, descr_vec_len)
+
+    # for more complicated algorithm: num_bytes_per_patch_nc = np.float32().nbytes * descr_vec_len
     rest = total_rows_num
 
     while rest > 0:
